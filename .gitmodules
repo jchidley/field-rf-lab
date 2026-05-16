@@ -1,0 +1,12 @@
+[submodule "vendor/NanoVNA-D"]
+	path = vendor/NanoVNA-D
+	url = https://github.com/DiSlord/NanoVNA-D.git
+[submodule "vendor/nanovna-tools"]
+	path = vendor/nanovna-tools
+	url = https://github.com/Ho-Ro/nanovna-tools.git
+[submodule "vendor/nanovna-saver"]
+	path = vendor/nanovna-saver
+	url = https://github.com/NanoVNA-Saver/nanovna-saver.git
+[submodule "vendor/rfnanocli"]
+	path = vendor/rfnanocli
+	url = https://github.com/roseengineering/rfnanocli.git
