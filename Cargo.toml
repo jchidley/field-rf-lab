@@ -1,0 +1,14 @@
+[package]
+name = "field_rf_lab"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[[bin]]
+name = "field_rf_lab"
+path = "src/main.rs"
+
+[lib]
+name = "field_rf_lab"
+path = "src/lib.rs"
