@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "kind": "repo-preflight-disposition",
+  "identity": "github.com/jchidley/field-rf-lab",
+  "decision": "no-change-required",
+  "reviewedCommit": "f81c3687f0099b00f55da5cc646b5e27b40552db",
+  "operation": "inspect",
+  "files": {
+    "README.md": "5726861d54ecc6f2b1a2efd348957fc1a03b2eba8cc1af2e9f90b3cd843e8c32"
+  },
+  "profileId": "4e2f946311539a962f68da645c3a22ac068d8be0022fc08f8ed3cae14331fcc2",
+  "reviewer": "controller-pi-session-01a07795-640e-7529-b8bf-bbdc58622b3e",
+  "summary": "Current reviewed guidance scope requires no repository-local change.",
+  "evidenceSummary": [
+    "Retain no-local-surface: 14-entry Rust/src/vendor scaffold and full README. AI provenance links and suggested global Cargo flags are human setup material, not an instruction template or authorization to change this host. No config/build/hardware operation.",
+    "Account-wide rollout identity, source scope, disposition, and validation evidence were reconciled."
+  ],
+  "limitations": [
+    "Prior semantic findings retained as historical evidence, not independently re-certified by this verification pass."
+  ],
+  "recordedAt": "2026-09-06T22:49:05.138Z",
+  "publicationApproved": false
+}
