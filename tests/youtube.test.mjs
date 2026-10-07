@@ -173,6 +173,24 @@ test('device login handles pending and slow_down then securely saves token', asy
   assert.equal((await fs.stat(file)).mode & 0o777, 0o600);
 });
 
+test('authorize returns a token without overwriting an existing login', async t => {
+  const file = path.join(await temp(t), 'token.json');
+  await writePrivate(file, JSON.stringify({ refresh_token: 'prior-test-only' }));
+  const before = await fs.readFile(file, 'utf8');
+  const responses = [
+    response({ device_code: 'device', user_code: 'code',
+      verification_url: 'https://www.google.com/device', expires_in: 60, interval: 1 }),
+    response({ access_token: 'new-access-test-only', refresh_token: 'new-refresh-test-only' })
+  ];
+  let clock = 0;
+  const oauth = new OAuth(client, 'test', {
+    file, fetchImpl: async () => responses.shift(),
+    now: () => clock, sleep: async ms => { clock += ms; }, log: quiet
+  });
+  assert.equal((await oauth.authorize()).access_token, 'new-access-test-only');
+  assert.equal(await fs.readFile(file, 'utf8'), before);
+});
+
 test('device login expiry does not save a token', async t => {
   const file = path.join(await temp(t), 'token.json');
   let clock = 0;
