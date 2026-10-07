@@ -1,0 +1,23 @@
+{
+  "session": "/home/jack/.pi/agent/sessions/--home-jack-github-field-rf-lab--/2026-05-17T09-03-12-556Z_019e352c-daab-752e-9099-0ad51cd00997.jsonl",
+  "source_lines": {
+    "scripts/youtube-create-playlist.mjs": [
+      265,
+      279,
+      297,
+      317
+    ],
+    "docs/youtube-profile-playlist-automation.md": [
+      269,
+      281,
+      299,
+      319
+    ]
+  },
+  "skipped_failed_edits": [
+    277
+  ],
+  "superseded_aborted_shell_calls": [
+    267
+  ]
+}

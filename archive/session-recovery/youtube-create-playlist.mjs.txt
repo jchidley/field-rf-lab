@@ -1,0 +1,168 @@
+#!/usr/bin/env node
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+
+// Device flow rejects youtube.force-ssl for this OAuth client type.
+// Use Google's YouTube Data API OAuth scope that permits playlist creation/item insertion.
+const SCOPES = ['https://www.googleapis.com/auth/youtube'];
+function safeProfileName(name) {
+  return name.replace(/[^A-Za-z0-9_.-]/g, '-');
+}
+
+function arg(name) {
+  const i = process.argv.indexOf(name);
+  if (i === -1) return undefined;
+  return process.argv[i + 1];
+}
+
+const profile = safeProfileName(arg('--profile') ?? 'default');
+const TOKEN_PATH = path.join(os.homedir(), '.cache', 'field-rf-lab', `youtube-oauth-token-${profile}.json`);
+
+function usage() {
+  console.error(`Usage:
+  GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... scripts/youtube-create-playlist.mjs \\
+    --profile radio-study --title "Playlist title" --description "Description" --privacy private --ids-file /path/to/video_ids.txt
+
+Credentials may also be supplied as GOOGLE_OAUTH_CLIENT_JSON, containing either:
+  {"installed":{"client_id":"...","client_secret":"..."}}
+or:
+  {"client_id":"...","client_secret":"..."}
+
+The script uses Google's OAuth device flow, caches the refresh token at:
+  ${TOKEN_PATH}
+
+Use --profile NAME to keep separate OAuth tokens for different YouTube/Brand accounts.
+`);
+  process.exit(2);
+}
+
+const title = arg('--title');
+const description = arg('--description') ?? '';
+const privacy = arg('--privacy') ?? 'private';
+const idsFile = arg('--ids-file');
+if (!title || !idsFile || !['private', 'unlisted', 'public'].includes(privacy)) usage();
+
+function credentials() {
+  if (process.env.GOOGLE_OAUTH_CLIENT_JSON) {
+    const parsed = JSON.parse(process.env.GOOGLE_OAUTH_CLIENT_JSON);
+    const c = parsed.installed ?? parsed.web ?? parsed;
+    return { client_id: c.client_id, client_secret: c.client_secret };
+  }
+  return { client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET };
+}
+
+const { client_id, client_secret } = credentials();
+if (!client_id || !client_secret) {
+  console.error('Missing GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET or GOOGLE_OAUTH_CLIENT_JSON');
+  usage();
+}
+
+async function postForm(url, fields) {
+  const body = new URLSearchParams(fields);
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch { throw new Error(`${res.status} ${text}`); }
+  if (!res.ok) throw new Error(`${res.status} ${JSON.stringify(json)}`);
+  return json;
+}
+
+async function loadToken() {
+  try { return JSON.parse(await fs.readFile(TOKEN_PATH, 'utf8')); } catch { return null; }
+}
+
+async function saveToken(token) {
+  await fs.mkdir(path.dirname(TOKEN_PATH), { recursive: true });
+  await fs.writeFile(TOKEN_PATH, JSON.stringify(token, null, 2));
+  await fs.chmod(TOKEN_PATH, 0o600);
+}
+
+async function deviceAuth() {
+  const dc = await postForm('https://oauth2.googleapis.com/device/code', {
+    client_id,
+    scope: SCOPES.join(' '),
+  });
+  console.error('\nAuthorize this script for the YouTube account/profile you want to modify:');
+  console.error(`  ${dc.verification_url}`);
+  console.error(`  Code: ${dc.user_code}\n`);
+  console.error(`Profile: ${profile}`);
+  console.error('Important: choose the correct Google/YouTube brand account in the browser.');
+
+  const deadline = Date.now() + dc.expires_in * 1000;
+  let interval = (dc.interval ?? 5) * 1000;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, interval));
+    try {
+      const token = await postForm('https://oauth2.googleapis.com/token', {
+        client_id,
+        client_secret,
+        device_code: dc.device_code,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+      });
+      await saveToken(token);
+      return token;
+    } catch (e) {
+      const msg = String(e.message);
+      if (msg.includes('authorization_pending')) continue;
+      if (msg.includes('slow_down')) { interval += 5000; continue; }
+      throw e;
+    }
+  }
+  throw new Error('OAuth device code expired');
+}
+
+async function refreshToken(refresh_token) {
+  const token = await postForm('https://oauth2.googleapis.com/token', {
+    client_id,
+    client_secret,
+    refresh_token,
+    grant_type: 'refresh_token',
+  });
+  const merged = { ...token, refresh_token };
+  await saveToken(merged);
+  return merged;
+}
+
+async function accessToken() {
+  const token = await loadToken();
+  if (token?.refresh_token) return (await refreshToken(token.refresh_token)).access_token;
+  return (await deviceAuth()).access_token;
+}
+
+async function youtube(method, endpoint, access_token, body) {
+  const res = await fetch(`https://www.googleapis.com/youtube/v3/${endpoint}`, {
+    method,
+    headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await res.text();
+  const json = text ? JSON.parse(text) : {};
+  if (!res.ok) throw new Error(`${method} ${endpoint}: ${res.status} ${JSON.stringify(json)}`);
+  return json;
+}
+
+const ids = (await fs.readFile(idsFile, 'utf8'))
+  .split(/\s+/)
+  .map(s => s.trim())
+  .filter(Boolean)
+  .filter((s, i, a) => a.indexOf(s) === i);
+if (!ids.length) throw new Error(`No IDs in ${idsFile}`);
+
+const token = await accessToken();
+const playlist = await youtube('POST', 'playlists?part=snippet,status', token, {
+  snippet: { title, description },
+  status: { privacyStatus: privacy },
+});
+
+for (const [i, videoId] of ids.entries()) {
+  await youtube('POST', 'playlistItems?part=snippet', token, {
+    snippet: {
+      playlistId: playlist.id,
+      resourceId: { kind: 'youtube#video', videoId },
+    },
+  });
+  console.error(`Added ${i + 1}/${ids.length}: ${videoId}`);
+}
+
+console.log(`https://www.youtube.com/playlist?list=${playlist.id}`);

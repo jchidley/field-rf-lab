@@ -1,0 +1,83 @@
+# YouTube profile playlist automation
+
+This repo can create named playlists in Jack's YouTube account using the YouTube Data API OAuth device flow.
+
+## What can and cannot be automated
+
+Can automate:
+
+- Create a named playlist in the authenticated YouTube account/profile.
+- Set privacy: `private`, `unlisted`, or `public`.
+- Add the repo's curated video ID lists in order.
+
+Cannot reliably automate:
+
+- Selecting offline/download in the official YouTube mobile app. After creation, open the playlist in the app and tap Download manually.
+
+## Google account/profile note
+
+Jack's intended content profile is the Google/YouTube account/profile reached via:
+
+`https://myaccount.google.com/u/0/b/110556253767945413632/?utm_source=YouTubeWeb&tab=rk&utm_medium=act&gar=WzgwLCIyMzMzODciXQ&tab=rk&hl=en-GB`
+
+During OAuth, choose this account/profile/brand identity in the browser.
+
+## Credentials
+
+Use a Google-approved OAuth client type for this flow: **TVs and Limited Input devices**. Enable the YouTube Data API v3 in the same Google Cloud project. The script uses Google's OAuth 2.0 Device Authorization flow and the official YouTube Data API v3 endpoints.
+
+The script uses the Google YouTube Data API OAuth scope `https://www.googleapis.com/auth/youtube`, because Google's OAuth device flow rejects `youtube.force-ssl` for this client type even though the playlist endpoints list it.
+
+Do not store secrets in plaintext. Store the OAuth client JSON in `ak`, for example under a service name such as `youtube-oauth-client-json`, then run:
+
+```bash
+export GOOGLE_OAUTH_CLIENT_JSON="$(ak get youtube-oauth-client-json)"
+```
+
+The JSON may be either Google's downloaded form:
+
+```json
+{"installed":{"client_id":"...","client_secret":"..."}}
+```
+
+or a flat form:
+
+```json
+{"client_id":"...","client_secret":"..."}
+```
+
+The script caches the resulting refresh token locally per profile:
+
+`~/.cache/field-rf-lab/youtube-oauth-token-<profile>.json`
+
+Use a stable `--profile` name for each YouTube/Brand account, for example `radio-study`, `personal`, or `workbench`. If you authorize the wrong Brand Account for a profile, delete that profile's token and rerun:
+
+```bash
+rm ~/.cache/field-rf-lab/youtube-oauth-token-radio-study.json
+```
+
+## Create playlists
+
+QMX/NanoVNA/field antenna playlist:
+
+```bash
+export GOOGLE_OAUTH_CLIENT_JSON="$(ak get youtube-oauth-client-json)"
+scripts/youtube-create-playlist.mjs \
+  --profile radio-study \
+  --title "QMX NanoVNA Field Antenna Study" \
+  --description "Curated from field-rf-lab: QMX, NanoVNA, S11, EFHW, seawater-grounded quarter-wave, matching and common-mode." \
+  --privacy private \
+  --ids-file data/playlists/combined-qmx-nanovna-field-antenna.ids
+```
+
+UK Full / US amateur exam support playlist:
+
+```bash
+export GOOGLE_OAUTH_CLIENT_JSON="$(ak get youtube-oauth-client-json)"
+scripts/youtube-create-playlist.mjs \
+  --profile radio-study \
+  --title "UK Full + US Amateur Exam Technical Gaps" \
+  --description "Curated from field-rf-lab around Jack's diagnostic gaps: mixers, images, Q, SSB PA linearity, propagation, gain references, and measurement." \
+  --privacy private \
+  --ids-file data/playlists/exam-support-uk-full-us-amateur.ids
+```

@@ -2,3 +2,8 @@
 Cargo.lock
 **/*.rs.bk
 *.pdb
+
+# Local credentials and runtime backups belong outside the checkout
+client_secret*.json
+youtube-oauth-token*.json
+.env
